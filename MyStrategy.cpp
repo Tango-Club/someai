@@ -22,9 +22,18 @@ int dis(Entity x, Entity y)
 {
 	return abs(x.position.x - y.position.x) + abs(x.position.y - y.position.y);
 }
+int dis(Vec2Int x, Vec2Int y)
+{
+	return abs(x.x - y.x) + abs(x.y - y.y);
+}
 
 int HC = 0;
 int fee;
+Entity posMe;
+bool cmp(Entity x, Entity y)
+{
+	return dis(x, posMe) < dis(y,posMe);
+}
 Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debugInterface)
 {
 	Action result = Action(std::unordered_map<int, EntityAction>());
@@ -35,6 +44,8 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 			fee = player.resource;
 		}
 	}
+	Vec2Int target = {10,10};
+	int dist = 999;
 	std::vector<Entity>unhealthy;
 	HC = 0;
 	for (size_t i = 0; i < playerView.entities.size(); i++) {
@@ -55,7 +66,23 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 	}
 	for (size_t i = 0; i < playerView.entities.size(); i++) {
 		const Entity& entity = playerView.entities[i];
-		if (entity.playerId == nullptr || *entity.playerId != myId) {
+		if (entity.playerId == nullptr) {
+			continue;
+		}
+		else if (*entity.playerId != myId) {
+			for (size_t j = 0; j < playerView.entities.size(); j++) {
+				const Entity& entityMe = playerView.entities[j];
+				if (entityMe.playerId == nullptr || *entityMe.playerId != myId)continue;
+				if (dist > dis(entity, entityMe)) {
+					dist = dis(entity, entityMe);
+					target = entity.position;
+				}
+			}
+		}
+	}
+	for (size_t i = 0; i < playerView.entities.size(); i++) {
+		const Entity& entity = playerView.entities[i];
+		if (entity.playerId == nullptr|| *entity.playerId != myId) {
 			continue;
 		}
 		const EntityProperties& properties = playerView.entityProperties.at(entity.entityType);
@@ -66,7 +93,7 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 		if (properties.canMove) {
 			if (entity.entityType != EntityType::BUILDER_UNIT){
 				moveAction = std::shared_ptr<MoveAction>(new MoveAction(
-					randPos(entity.position,playerView),
+					target,
 				    true,
 					true));
 			}
@@ -78,15 +105,32 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 						true,
 						true));
 				}
-				else if (HC < 10&&playerView.entityProperties.at(EntityType::HOUSE).initialCost<=fee){
+				else if (HC<5&&playerView.entityProperties.at(EntityType::HOUSE).initialCost<=fee){
 					fee -= playerView.entityProperties.at(EntityType::HOUSE).initialCost;
 					buildAction = std::shared_ptr<BuildAction>(new BuildAction(
 						EntityType::HOUSE,
 						Vec2Int(entity.position.x + playerView.entityProperties.at(entity.entityType).size, entity.position.y + playerView.entityProperties.at(entity.entityType).size - 1)));
 				}
+				/*
+				else if (playerView.entityProperties.at(EntityType::TURRET).initialCost <= fee) {
+					fee -= playerView.entityProperties.at(EntityType::TURRET).initialCost;
+					buildAction = std::shared_ptr<BuildAction>(new BuildAction(
+						EntityType::TURRET,
+						Vec2Int(std::max(10,entity.position.x + playerView.entityProperties.at(entity.entityType).size), std::max(10,entity.position.y + playerView.entityProperties.at(entity.entityType).size - 1))));
+				}*/
 				else{
+					Vec2Int target = { playerView.mapSize - 1, playerView.mapSize - 1 };
+					for (int j = 0; j < playerView.entities.size(); j++)
+					{
+						const Entity& entityR = playerView.entities[j];
+						if (entityR.playerId == nullptr) {
+							if(dis(entityR.position,entity.position)<dis(target,entity.position)){
+								target = entityR.position;
+							}
+						}
+					}
 					moveAction = std::shared_ptr<MoveAction>(new MoveAction(
-						Vec2Int(playerView.mapSize - 1, playerView.mapSize - 1),
+						target,
 						true,
 						true));
 				}
@@ -94,12 +138,15 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 		}
 		else if (properties.build != nullptr) {
 			EntityType entityType = properties.build->options[0];
+			if (playerView.currentTick<100&&entityType != EntityType::BUILDER_UNIT)continue;
 			if (playerView.entityProperties.at(entityType).populationUse <= HC) {
 				buildAction = std::shared_ptr<BuildAction>(new BuildAction(
 					entityType,
 					Vec2Int(entity.position.x + properties.size, entity.position.y + properties.size - 1)));
 			}
+			
 		}
+		posMe = entity;
 		std::vector<EntityType> validAutoAttackTargets;
 		if (entity.entityType == BUILDER_UNIT&&repairAction==nullptr) {
 			validAutoAttackTargets.push_back(RESOURCE);
