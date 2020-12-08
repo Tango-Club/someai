@@ -1,6 +1,6 @@
 # someai
 
-## Features:
+## Features(pre为版本前瞻):
 
 
 ### v1:
@@ -26,3 +26,5 @@
 后期造RangedUnit 后期钱多考虑多造兵营
 
 分批寻找  x y权重分两波对付两个方向
+
+农民又挤压情况
