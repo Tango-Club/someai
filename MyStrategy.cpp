@@ -137,6 +137,14 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 			}
 			else {
 				bool f = 0;
+				int mini = 999;
+				for (size_t j = 0; j < playerView.entities.size(); j++) {
+					const Entity& entityE = playerView.entities[j];
+					if (entityE.playerId == nullptr || *entityE.playerId == myId) {
+						continue;
+					}
+					mini = std::min(mini, dis(entity, entityE));
+				}
 				for (size_t j = 0; j < playerView.entities.size(); j++) {
 					const Entity& entityE = playerView.entities[j];
 					if (entityE.playerId == nullptr || *entityE.playerId == myId || playerView.entityProperties.at(entityE.entityType).attack == nullptr || entityE.entityType == EntityType::BUILDER_UNIT) {
@@ -163,7 +171,7 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 				}
 				for (const Entity& entityR : unhealthy)
 				{
-					if (!f && dis(entity, entityR) < 10 && entity.position.x - entityR.position.x != entity.position.y - entityR.position.y && abs(entity.position.y - entityR.position.y) == 1)
+					if (!f && dis(entity, entityR) < 10)
 					{
 						f = 1;
 						repairAction = std::shared_ptr<RepairAction>(new RepairAction(entityR.id));
@@ -178,16 +186,22 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 				{
 
 				}
-				else if ((entity.position.x < 5 || entity.position.x>15 || entity.position.y < 5 || entity.position.y>15) && playerView.entityProperties.at(EntityType::RANGED_BASE).initialCost * 2 <= fee && rg_cnt < 2) {
+				else if (mini>=20 && (entity.position.x < 5 || entity.position.x>15 || entity.position.y < 5 || entity.position.y>15) && playerView.entityProperties.at(EntityType::RANGED_BASE).initialCost * 2 <= fee && rg_cnt < 2) {
 					//fee -= playerView.entityProperties.at(EntityType::RANGED_BASE).initialCost;
 					buildAction = std::shared_ptr<BuildAction>(new BuildAction(
 						EntityType::RANGED_BASE,
 						Vec2Int(std::max(0, entity.position.x), std::max(0, entity.position.y + 1))));
 				}
-				else if ((entity.position.x < 9 || entity.position.x>11 || entity.position.y < 9 || entity.position.y>11) && HC < 5 && playerView.entityProperties.at(EntityType::HOUSE).initialCost <= fee) {
+				else if (mini >= 20 && (entity.position.x < 9 || entity.position.x>11 || entity.position.y < 9 || entity.position.y>11) && HC < 5 && playerView.entityProperties.at(EntityType::HOUSE).initialCost <= fee) {
 					fee -= playerView.entityProperties.at(EntityType::HOUSE).initialCost;
 					buildAction = std::shared_ptr<BuildAction>(new BuildAction(
 						EntityType::HOUSE,
+						Vec2Int(entity.position.x + playerView.entityProperties.at(entity.entityType).size, entity.position.y + playerView.entityProperties.at(entity.entityType).size - 1)));
+				}
+				else if (mini >= 10 && (entity.position.x > 20|| entity.position.y > 20) && playerView.entityProperties.at(EntityType::TURRET).initialCost*4 <= fee) {
+					fee -= playerView.entityProperties.at(EntityType::TURRET).initialCost;
+					buildAction = std::shared_ptr<BuildAction>(new BuildAction(
+						EntityType::TURRET,
 						Vec2Int(entity.position.x + playerView.entityProperties.at(entity.entityType).size, entity.position.y + playerView.entityProperties.at(entity.entityType).size - 1)));
 				}
 				/*
