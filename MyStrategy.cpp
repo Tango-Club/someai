@@ -128,7 +128,7 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 				}
 				if (dist > distS || entity.entityType != EntityType::RANGED_UNIT)target = targetS, dist = distS;
 				if (dist > 10) {
-					target = { 30,30 };
+					target = { 20,20 };
 				}
 				moveAction = std::shared_ptr<MoveAction>(new MoveAction(
 					target,
@@ -151,9 +151,19 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 						break;
 					}
 				}
+				for (size_t j = 0; j < playerView.entities.size(); j++) {
+					const Entity& entityE = playerView.entities[j];
+					if (entityE.playerId == nullptr || *entityE.playerId != myId || playerView.entityProperties.at(entityE.entityType).attack == nullptr || entityE.entityType == EntityType::BUILDER_UNIT) {
+						continue;
+					}
+					if (dis(entity, entityE)<5) {
+						f = 0;
+						break;
+					}
+				}
 				for (const Entity& entityR : unhealthy)
 				{
-					if (!f && dis(entity, entityR) < 10)
+					if (!f && dis(entity, entityR) < 10&&entity.position.x-entityR.position.x!= entity.position.y - entityR.position.y)
 					{
 						f = 1;
 						repairAction = std::shared_ptr<RepairAction>(new RepairAction(entityR.id));
@@ -174,7 +184,7 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 						EntityType::RANGED_BASE,
 						Vec2Int(std::max(0, entity.position.x), std::max(0, entity.position.y + 1))));
 				}
-				else if ((entity.position.x < 5 || entity.position.x>15 || entity.position.y < 5 || entity.position.y>15) && HC < 5 && playerView.entityProperties.at(EntityType::HOUSE).initialCost <= fee) {
+				else if ((entity.position.x < 9 || entity.position.x>11 || entity.position.y < 9 || entity.position.y>11) && HC < 5 && playerView.entityProperties.at(EntityType::HOUSE).initialCost <= fee) {
 					fee -= playerView.entityProperties.at(EntityType::HOUSE).initialCost;
 					buildAction = std::shared_ptr<BuildAction>(new BuildAction(
 						EntityType::HOUSE,
@@ -189,6 +199,7 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 				}*/
 				else {
 					Vec2Int target = { playerView.mapSize - 1, playerView.mapSize - 1 };
+					/*
 					for (int j = 0; j < playerView.entities.size(); j++)
 					{
 						const Entity& entityR = playerView.entities[j];
@@ -197,7 +208,7 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 								target = entityR.position;
 							}
 						}
-					}
+					}*/
 					moveAction = std::shared_ptr<MoveAction>(new MoveAction(
 						target,
 						true,
