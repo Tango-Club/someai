@@ -53,7 +53,7 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 		const Entity& entity = playerView.entities[i];
 		if (entity.playerId != nullptr && *entity.playerId == myId) {
 			HC -= playerView.entityProperties.at(entity.entityType).populationUse;
-			HC += playerView.entityProperties.at(entity.entityType).populationProvide;
+			if (entity.health == playerView.entityProperties.at(entity.entityType).maxHealth)HC += playerView.entityProperties.at(entity.entityType).populationProvide;
 			if (entity.entityType == EntityType::BUILDER_UNIT) {
 				builder_cnt++;
 			}
@@ -139,10 +139,10 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 				bool f = 0;
 				for (size_t j = 0; j < playerView.entities.size(); j++) {
 					const Entity& entityE = playerView.entities[j];
-					if (entityE.playerId == nullptr || *entityE.playerId == myId|| playerView.entityProperties.at(entityE.entityType).attack==nullptr||entityE.entityType==EntityType::BUILDER_UNIT) {
+					if (entityE.playerId == nullptr || *entityE.playerId == myId || playerView.entityProperties.at(entityE.entityType).attack == nullptr || entityE.entityType == EntityType::BUILDER_UNIT) {
 						continue;
 					}
-					if (playerView.entityProperties.at(entityE.entityType).attack->attackRange+5>dis(entity, entityE)) {
+					if (playerView.entityProperties.at(entityE.entityType).attack->attackRange + 5 > dis(entity, entityE)) {
 						moveAction = std::shared_ptr<MoveAction>(new MoveAction(
 							{ 10,10 },
 							true,
@@ -156,14 +156,14 @@ Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debug
 					if (entityE.playerId == nullptr || *entityE.playerId != myId || playerView.entityProperties.at(entityE.entityType).attack == nullptr || entityE.entityType == EntityType::BUILDER_UNIT) {
 						continue;
 					}
-					if (dis(entity, entityE)<5) {
+					if (dis(entity, entityE) < 5) {
 						f = 0;
 						break;
 					}
 				}
 				for (const Entity& entityR : unhealthy)
 				{
-					if (!f && dis(entity, entityR) < 10&&entity.position.x-entityR.position.x!= entity.position.y - entityR.position.y)
+					if (!f && dis(entity, entityR) < 10 && entity.position.x - entityR.position.x != entity.position.y - entityR.position.y && abs(entity.position.y - entityR.position.y) == 1)
 					{
 						f = 1;
 						repairAction = std::shared_ptr<RepairAction>(new RepairAction(entityR.id));
