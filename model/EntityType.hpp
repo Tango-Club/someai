@@ -3,7 +3,7 @@
 
 #include "../Stream.hpp"
 
-enum EntityType {
+enum class EntityType {
     WALL = 0,
     HOUSE = 1,
     BUILDER_BASE = 2,
