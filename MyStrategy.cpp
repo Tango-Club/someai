@@ -7,6 +7,7 @@
 #include <exception>
 
 #include "MyStrategy.hpp"
+#include <cassert>
 MyStrategy::MyStrategy() {}
 
 
@@ -18,6 +19,8 @@ enum class NodeType
 	MinerNode,
 	Repairer,
 	BuilderNode,
+	DaemonNode,
+	GuardNode,
 };
 
 namespace HfsmData
@@ -68,8 +71,8 @@ namespace HfsmData
 			for (int j = pos.y; j < pos.y + size; j++)
 			{
 				if (visM[i][j])return 0;
-				if (i<0||i >= playerView.mapSize)return 0;
-				if (j<0||j >= playerView.mapSize)return 0;
+				if (i < 0 || i >= playerView.mapSize)return 0;
+				if (j < 0 || j >= playerView.mapSize)return 0;
 			}
 		}
 		return 1;
@@ -205,6 +208,40 @@ public:
 		return HfsmData::finRoundM(selfInfo.position, size);
 	}
 };
+std::shared_ptr<HfsmNode> init_node(Entity entity);
+class EscaperNode : public HfsmNode
+{
+public:
+	std::set<EntityType>noEscape;
+	EscaperNode(Entity entity, std::set<EntityType> noV = {}) :HfsmNode(entity)
+	{
+		noEscape = noV;
+	}
+	virtual std::shared_ptr<HfsmNode> get_next_state()
+	{
+		for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+		{
+			const Entity& entity = HfsmData::playerView.entities[i];
+			if (entity.playerId == nullptr || *entity.playerId == HfsmData::playerView.myId)continue;
+			if (noEscape.count(entity.entityType))continue;
+			if (HfsmData::playerView.entityProperties.at(entity.entityType).attack == nullptr)continue;
+			if (HfsmData::playerView.entityProperties.at(entity.entityType).attack->attackRange + 2 >=
+				HfsmData::dis(selfInfo, entity))
+				return nullptr;
+		}
+		return init_node(selfInfo);
+	}
+	virtual EntityAction get_action()
+	{
+		std::shared_ptr<MoveAction> moveAction = std::shared_ptr<MoveAction>(new MoveAction(
+			Vec2Int(15, 15), true, true));
+		std::shared_ptr<BuildAction> buildAction = nullptr;
+		std::vector<EntityType> validAutoAttackTargets;
+		std::shared_ptr<AttackAction> attackAction = nullptr;
+		std::shared_ptr<RepairAction> repairAction = nullptr;
+		return EntityAction(moveAction, buildAction, attackAction, repairAction);
+	}
+};
 class BuildNode : public HfsmNode
 {
 public:
@@ -280,6 +317,14 @@ public:
 	{
 		std::shared_ptr<MoveAction> moveAction = nullptr;
 		std::shared_ptr<BuildAction> buildAction = std::shared_ptr<BuildAction>(new BuildAction(BaseType, findPos()));
+		int cnt = 0;
+		for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+		{
+			const Entity& entity = HfsmData::playerView.entities[i];
+			if (entity.playerId == nullptr || *entity.playerId != HfsmData::playerView.myId)continue;
+			if (entity.entityType == EntityType::BUILDER_UNIT)cnt++;
+		}
+		if (cnt > 50)buildAction = nullptr;
 		std::shared_ptr<RepairAction> repairAction = nullptr;
 		std::shared_ptr<AttackAction> attackAction = nullptr;
 		return EntityAction(moveAction, buildAction, attackAction, repairAction);
@@ -300,7 +345,7 @@ public:
 		std::shared_ptr<RepairAction> repairAction = nullptr;
 		std::shared_ptr<AttackAction> attackAction = nullptr;
 
-		if (timer <= 5)buildAction = std::shared_ptr<BuildAction>(new BuildAction(BaseType, findPos()));
+		if (timer <= 20)buildAction = std::shared_ptr<BuildAction>(new BuildAction(BaseType, findPos()));
 		timer--;
 		if (timer <= 0)timer = 20;
 
@@ -310,18 +355,47 @@ public:
 class MinerNode : public HfsmNode
 {
 public:
-	MinerNode(Entity entity) :HfsmNode(entity) {}
+	std::set<EntityType>noEscape;
+	MinerNode(Entity entity) :HfsmNode(entity)
+	{
+		noEscape = { EntityType::BUILDER_UNIT };
+	}
 	virtual NodeType get_type()
 	{
 		return NodeType::MinerNode;
 	}
 	virtual std::shared_ptr<HfsmNode> get_next_state()
 	{
+		for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+		{
+			const Entity& entity = HfsmData::playerView.entities[i];
+			if (entity.playerId == nullptr || *entity.playerId == HfsmData::playerView.myId)continue;
+			if (noEscape.count(entity.entityType))continue;
+			if (HfsmData::playerView.entityProperties.at(entity.entityType).attack == nullptr)continue;
+			if (HfsmData::playerView.entityProperties.at(entity.entityType).attack->attackRange + 3 >=
+				HfsmData::dis(selfInfo, entity))
+				return std::shared_ptr<HfsmNode>(new EscaperNode(entity, { EntityType::BUILDER_UNIT }));
+		}
 		return nullptr;
 	}
 	virtual EntityAction get_action()
 	{
 		std::shared_ptr<MoveAction> moveAction = nullptr;
+		if (selfInfo.id % 3 == 0)
+		{
+			moveAction = std::shared_ptr<MoveAction>(new MoveAction(
+				Vec2Int(HfsmData::playerView.mapSize - 1, HfsmData::playerView.mapSize - 1), true, true));
+		}
+		if (selfInfo.id % 3 == 1)
+		{
+			moveAction = std::shared_ptr<MoveAction>(new MoveAction(
+				Vec2Int(selfInfo.position.x, HfsmData::playerView.mapSize - 1), true, true));
+		}
+		if (selfInfo.id % 3 == 2)
+		{
+			moveAction = std::shared_ptr<MoveAction>(new MoveAction(
+				Vec2Int(HfsmData::playerView.mapSize - 1, selfInfo.position.y), true, true));
+		}
 		std::shared_ptr<BuildAction> buildAction = nullptr;
 		std::vector<EntityType> validAutoAttackTargets = { EntityType::RESOURCE };
 		std::shared_ptr<AttackAction> attackAction = std::shared_ptr<AttackAction>(new AttackAction(
@@ -354,8 +428,8 @@ public:
 		std::shared_ptr<MoveAction> moveAction = nullptr;
 		if (HfsmData::dis(selfInfo, HfsmData::viewById[target]) > 1)
 		{
-			Vec2Int pos=HfsmData::finRoundM(HfsmData::viewById[target].position,
-				HfsmData::playerView.entityProperties.at(HfsmData::viewById[target].entityType).size,selfInfo.position);
+			Vec2Int pos = HfsmData::finRoundM(HfsmData::viewById[target].position,
+				HfsmData::playerView.entityProperties.at(HfsmData::viewById[target].entityType).size, selfInfo.position);
 			moveAction = std::shared_ptr<MoveAction>(new MoveAction(pos, true, true));
 		}
 		std::shared_ptr<BuildAction> buildAction = nullptr;
@@ -398,7 +472,105 @@ public:
 		return EntityAction(moveAction, buildAction, attackAction, repairAction);
 	}
 };
-
+class DaemonNode : public HfsmNode
+{
+public:
+	std::set<EntityType>noEscape;
+	DaemonNode(Entity entity) :HfsmNode(entity)
+	{
+		noEscape = { EntityType::RANGED_UNIT,EntityType::BUILDER_UNIT };
+	}
+	virtual NodeType get_type()
+	{
+		return NodeType::DaemonNode;
+	}
+	virtual std::shared_ptr<HfsmNode> get_next_state()
+	{
+		for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+		{
+			const Entity& entity = HfsmData::playerView.entities[i];
+			if (entity.playerId == nullptr || *entity.playerId == HfsmData::playerView.myId)continue;
+			if (noEscape.count(entity.entityType))continue;
+			if (HfsmData::playerView.entityProperties.at(entity.entityType).attack == nullptr)continue;
+			if (HfsmData::playerView.entityProperties.at(entity.entityType).attack->attackRange + 3 >=
+				HfsmData::dis(selfInfo, entity))
+				return std::shared_ptr<HfsmNode>(new EscaperNode(entity, { EntityType::RANGED_UNIT,EntityType::BUILDER_UNIT }));
+		}
+		return nullptr;
+	}
+	virtual EntityAction get_action()
+	{
+		std::shared_ptr<MoveAction> moveAction = std::shared_ptr<MoveAction>(new MoveAction(
+			Vec2Int(15, 15), true, true));
+		for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+		{
+			const Entity& entity = HfsmData::playerView.entities[i];
+			if (entity.playerId == nullptr || *entity.playerId == HfsmData::playerView.myId)continue;
+			if (entity.entityType != EntityType::RANGED_UNIT)continue;
+			if (HfsmData::dis(entity, selfInfo) <= HfsmData::RANGED_UNIT.attack->attackRange + 3)
+				moveAction = nullptr;
+		}
+		std::shared_ptr<BuildAction> buildAction = nullptr;
+		std::vector<EntityType> validAutoAttackTargets;
+		std::shared_ptr<AttackAction> attackAction = std::shared_ptr<AttackAction>(new AttackAction(
+			nullptr, std::shared_ptr<AutoAttack>(new AutoAttack(HfsmData::RANGED_UNIT.sightRange, validAutoAttackTargets))));
+		std::shared_ptr<RepairAction> repairAction = nullptr;
+		return EntityAction(moveAction, buildAction, attackAction, repairAction);
+	}
+};
+class GuardNode : public HfsmNode
+{
+public:
+	std::set<EntityType>noEscape;
+	int target;
+	GuardNode(Entity entity, int enemy) :HfsmNode(entity)
+	{
+		target = enemy;
+		noEscape = { EntityType::RANGED_UNIT,EntityType::TURRET,EntityType::BUILDER_UNIT };
+	}
+	virtual NodeType get_type()
+	{
+		return NodeType::GuardNode;
+	}
+	virtual std::shared_ptr<HfsmNode> get_next_state()
+	{
+		for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+		{
+			const Entity& entity = HfsmData::playerView.entities[i];
+			if (entity.playerId == nullptr || *entity.playerId == HfsmData::playerView.myId)continue;
+			if (noEscape.count(entity.entityType))continue;
+			if (HfsmData::playerView.entityProperties.at(entity.entityType).attack == nullptr)continue;
+			if (HfsmData::playerView.entityProperties.at(entity.entityType).attack->attackRange + 3 >=
+				HfsmData::dis(selfInfo, entity))
+				return std::shared_ptr<HfsmNode>(new EscaperNode(entity,
+					{ EntityType::RANGED_UNIT,EntityType::TURRET,EntityType::BUILDER_UNIT }));
+		}
+		if (!HfsmData::viewById.count(target))
+		{
+			return std::shared_ptr<HfsmNode>(new DaemonNode(selfInfo));
+		}
+		return nullptr;
+	}
+	virtual EntityAction get_action()
+	{
+		std::shared_ptr<MoveAction> moveAction = std::shared_ptr<MoveAction>(new MoveAction(
+			HfsmData::viewById[target].position, true, true));
+		for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+		{
+			const Entity& entity = HfsmData::playerView.entities[i];
+			if (entity.playerId == nullptr || *entity.playerId == HfsmData::playerView.myId)continue;
+			if (entity.entityType != EntityType::RANGED_UNIT)continue;
+			if (HfsmData::dis(entity, selfInfo) <= HfsmData::RANGED_UNIT.attack->attackRange + 3)
+				moveAction = nullptr;
+		}
+		std::shared_ptr<BuildAction> buildAction = nullptr;
+		std::vector<EntityType> validAutoAttackTargets;
+		std::shared_ptr<AttackAction> attackAction = std::shared_ptr<AttackAction>(new AttackAction(
+			nullptr, std::shared_ptr<AutoAttack>(new AutoAttack(HfsmData::RANGED_UNIT.sightRange, validAutoAttackTargets))));
+		std::shared_ptr<RepairAction> repairAction = nullptr;
+		return EntityAction(moveAction, buildAction, attackAction, repairAction);
+	}
+};
 
 
 
@@ -425,7 +597,39 @@ std::shared_ptr<HfsmNode> init_node(Entity entity)
 	{
 		return std::shared_ptr<HfsmNode>(new MinerNode(entity));
 	}
+	if (entity.entityType == EntityType::RANGED_UNIT)
+	{
+		return std::shared_ptr<HfsmNode>(new DaemonNode(entity));
+	}
+	if (entity.entityType == EntityType::MELEE_UNIT)
+	{
+		return std::shared_ptr<HfsmNode>(new DaemonNode(entity));
+	}
 	return std::shared_ptr<HfsmNode>(new HfsmNode(entity));
+}
+std::vector<Entity> getNodes(NodeType nodeType)
+{
+	std::vector<Entity>miner;
+	for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+	{
+		const Entity& entity = HfsmData::playerView.entities[i];
+		if (entity.playerId == nullptr || *entity.playerId != HfsmData::playerView.myId)continue;
+		if (HfsmData::hfsmStates[entity.id]->get_type() != nodeType)continue;
+		miner.push_back(entity);
+	}
+	return miner;
+}
+std::vector<Entity> getUnits(EntityType entityType)
+{
+	std::vector<Entity>units;
+	for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+	{
+		const Entity& entity = HfsmData::playerView.entities[i];
+		if (entity.playerId == nullptr || *entity.playerId != HfsmData::playerView.myId)continue;
+		if (HfsmData::hfsmStates[entity.id]->selfInfo.entityType != entityType)continue;
+		units.push_back(entity);
+	}
+	return units;
 }
 void repairConvene()
 {
@@ -438,19 +642,12 @@ void repairConvene()
 		if (entity.health == HfsmData::playerView.entityProperties.at(entity.entityType).maxHealth)continue;
 		unhealthy.push_back(entity);
 	}
-	std::vector<Entity>miner;
-	for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
-	{
-		const Entity& entity = HfsmData::playerView.entities[i];
-		if (entity.playerId == nullptr || *entity.playerId != HfsmData::playerView.myId)continue;
-		if (HfsmData::hfsmStates[entity.id]->get_type() != NodeType::MinerNode)continue;
-		miner.push_back(entity);
-	}
+	std::vector<Entity>miner = getNodes(NodeType::MinerNode);
 	sort(unhealthy.begin(), unhealthy.end(),
 		[](Entity a, Entity b) {return a.position.x + a.position.y < b.position.x + b.position.y; });
 	for (Entity entity : unhealthy)
 	{
-		int cnt = HfsmData::playerView.entityProperties.at(entity.entityType).size;
+		int cnt = 4;
 		for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
 		{
 			const Entity& entityE = HfsmData::playerView.entities[i];
@@ -468,10 +665,17 @@ void repairConvene()
 		}
 	}
 }
-void buildConvene()
+void buildHouseConvene()
 {
 	if (HfsmData::player.resource < HfsmData::HOUSE.initialCost)return;
 	int population = HfsmData::countPopulation();
+	for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+	{
+		const Entity& entity = HfsmData::playerView.entities[i];
+		if (entity.playerId == nullptr || *entity.playerId != HfsmData::playerView.myId)continue;
+		population += HfsmData::playerView.entityProperties.at(entity.entityType).populationProvide;
+		population -= HfsmData::playerView.entityProperties.at(entity.entityType).populationUse;
+	}
 	for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
 	{
 		const Entity& entity = HfsmData::playerView.entities[i];
@@ -480,22 +684,15 @@ void buildConvene()
 		EntityType buildType = std::dynamic_pointer_cast<BuilderNode>(HfsmData::hfsmStates[entity.id])->buildType;
 		population += HfsmData::playerView.entityProperties.at(buildType).populationProvide;
 	}
-	if (population >= 5)return;
-	std::vector<Entity>miner;
-	for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
-	{
-		const Entity& entity = HfsmData::playerView.entities[i];
-		if (entity.playerId == nullptr || *entity.playerId != HfsmData::playerView.myId)continue;
-		if (HfsmData::hfsmStates[entity.id]->get_type() != NodeType::MinerNode)continue;
-		miner.push_back(entity);
-		break;
-	}
+	if (population >= 10)return;
+	std::vector<Entity>miner = getNodes(NodeType::MinerNode);
 	if (miner.size() == 0)return;
-	for (int i = 0; i <= 20; i += 4)
+	for (int i = 1; i <= 23; i += 4)
 	{
-		for (int j = 0; j <= 20; j += 4)
+		for (int j = 1; j <= 23; j += 4)
 		{
-			if (HfsmData::canFull(Vec2Int(i, j), HfsmData::HOUSE.size))
+			if (i < 5 && j < 5)continue;;
+			if (HfsmData::canFullM(Vec2Int(i, j), HfsmData::HOUSE.size))
 			{
 				sort(miner.begin(), miner.end(),
 					[=](Entity a, Entity b)
@@ -509,10 +706,104 @@ void buildConvene()
 		}
 	}
 }
+void buildRangerBaseConvene()
+{
+	if (HfsmData::player.resource < HfsmData::RANGED_BASE.initialCost)return;
+	for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+	{
+		const Entity& entity = HfsmData::playerView.entities[i];
+		if (entity.playerId == nullptr || *entity.playerId != HfsmData::playerView.myId)continue;
+		if (HfsmData::hfsmStates[entity.id]->get_type() != NodeType::BuilderNode)continue;
+		EntityType buildType = std::dynamic_pointer_cast<BuilderNode>(HfsmData::hfsmStates[entity.id])->buildType;
+		if (buildType == EntityType::RANGED_BASE)return;
+	}
+	for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+	{
+		const Entity& entity = HfsmData::playerView.entities[i];
+		if (entity.playerId == nullptr || *entity.playerId != HfsmData::playerView.myId)continue;
+		if (entity.entityType == EntityType::RANGED_BASE)return;
+	}
+	if (!HfsmData::canFullM(Vec2Int(0, 0), HfsmData::RANGED_BASE.size))return;
+	std::vector<Entity>miner = getNodes(NodeType::MinerNode);
+	if (miner.size() == 0)return;
+	sort(miner.begin(), miner.end(),
+		[=](Entity a, Entity b)
+		{return HfsmData::dis(Vec2Int(0, 0), a.position) > HfsmData::dis(Vec2Int(0, 0), b.position); });
+	Entity entityE = miner.back();
+	HfsmData::hfsmStates[entityE.id] = std::shared_ptr<HfsmNode>(new  BuilderNode(
+		entityE, EntityType::RANGED_BASE, Vec2Int(0, 0)));
+	miner.pop_back();
+}
+void daemonConvene(int limit)
+{
+	std::vector<Entity>entitys;
+	std::vector<Entity>builders = getUnits(EntityType::BUILDER_UNIT);
+	entitys.insert(entitys.end(), builders.begin(), builders.end());
+	builders = getUnits(EntityType::HOUSE);
+	entitys.insert(entitys.end(), builders.begin(), builders.end());
+	builders = getUnits(EntityType::TURRET);
+	entitys.insert(entitys.end(), builders.begin(), builders.end());
+	builders = getUnits(EntityType::BUILDER_BASE);
+	entitys.insert(entitys.end(), builders.begin(), builders.end());
+	builders = getUnits(EntityType::RANGED_BASE);
+	entitys.insert(entitys.end(), builders.begin(), builders.end());
+	builders = getUnits(EntityType::MELEE_BASE);
+	entitys.insert(entitys.end(), builders.begin(), builders.end());
+	std::vector<Entity>unsafe;
+	std::map<int, int>cnt;
+	for (Entity builder : entitys)
+	{
+		int dis = 999;
+		Entity enemy;
+		for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
+		{
+			const Entity& entity = HfsmData::playerView.entities[i];
+			if (entity.playerId == nullptr || *entity.playerId == HfsmData::playerView.myId)continue;
+			if (entity.entityType != EntityType::RANGED_UNIT &&
+				entity.entityType != EntityType::MELEE_UNIT && entity.entityType != EntityType::TURRET)
+				continue;
+			if (dis > HfsmData::dis(entity, builder))
+			{
+				dis = HfsmData::dis(entity, builder);
+				enemy = entity;
+			}
+		}
+		if (dis < limit)
+		{
+			enemy.health = dis;//借用变量做排序
+			unsafe.push_back(enemy);
+			cnt[enemy.id] = 4;
+			if (HfsmData::playerView.entityProperties.at(builder.entityType).canMove)
+			{
+				builder.health = dis * 2;
+				unsafe.push_back(builder);
+				cnt[builder.id] = 2;
+			}
+		}
+	}
+	sort(unsafe.begin(), unsafe.end(), [](Entity a, Entity b) {return a.health > b.health; });
+	std::vector<Entity>daemons = getNodes(NodeType::DaemonNode);
+	std::vector<Entity>guards = getNodes(NodeType::GuardNode);
+	for (Entity guard : guards)
+		cnt[std::dynamic_pointer_cast<GuardNode>(HfsmData::hfsmStates[guard.id])->target]--;
+	for (Entity enemy : unsafe)
+	{
+		sort(daemons.begin(), daemons.end(),
+			[=](Entity a, Entity b) {return HfsmData::dis(enemy, a) > HfsmData::dis(enemy, b); });
+		while (daemons.size() && cnt[enemy.id]-- > 0)
+		{
+			Entity guard = daemons.back();
+			HfsmData::hfsmStates[guard.id] = std::shared_ptr<HfsmNode>(new GuardNode(guard, enemy.id));
+			daemons.pop_back();
+		}
+	}
+}
 void convene()
 {
 	repairConvene();
-	buildConvene();
+	buildHouseConvene();
+	buildRangerBaseConvene();
+	daemonConvene(10);
 }
 Action MyStrategy::getAction(const PlayerView& playerView, DebugInterface* debugInterface)
 {
@@ -549,6 +840,34 @@ void MyStrategy::debugUpdate(const PlayerView& playerView, DebugInterface& debug
 		DebugCommand::Add
 		(
 			std::shared_ptr<DebugData::Log>(new DebugData::Log("time:" + std::to_string(playerView.currentTick)))
+		)
+	);
+	debugInterface.send
+	(
+		DebugCommand::Add
+		(
+			std::shared_ptr<DebugData::Log>(new DebugData::Log("guard:" + std::to_string(getNodes(NodeType::GuardNode).size())))
+		)
+	);
+	debugInterface.send
+	(
+		DebugCommand::Add
+		(
+			std::shared_ptr<DebugData::Log>(new DebugData::Log("daemon:" + std::to_string(getNodes(NodeType::DaemonNode).size())))
+		)
+	);
+	debugInterface.send
+	(
+		DebugCommand::Add
+		(
+			std::shared_ptr<DebugData::Log>(new DebugData::Log("builder:" + std::to_string(getNodes(NodeType::BuilderNode).size())))
+		)
+	);
+	debugInterface.send
+	(
+		DebugCommand::Add
+		(
+			std::shared_ptr<DebugData::Log>(new DebugData::Log("minier:" + std::to_string(getNodes(NodeType::MinerNode).size())))
 		)
 	);
 }

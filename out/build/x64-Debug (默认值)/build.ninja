@@ -51,14 +51,6 @@ build CMakeFiles\aicup2020.dir\DebugInterface.cpp.obj: CXX_COMPILER__aicup2020_D
   TARGET_COMPILE_PDB = CMakeFiles\aicup2020.dir\
   TARGET_PDB = aicup2020.pdb
 
-build CMakeFiles\aicup2020.dir\HFSM.cpp.obj: CXX_COMPILER__aicup2020_Debug ..\..\..\HFSM.cpp || cmake_object_order_depends_target_aicup2020
-  DEFINES = -DWIN32
-  FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1
-  OBJECT_DIR = CMakeFiles\aicup2020.dir
-  OBJECT_FILE_DIR = CMakeFiles\aicup2020.dir
-  TARGET_COMPILE_PDB = CMakeFiles\aicup2020.dir\
-  TARGET_PDB = aicup2020.pdb
-
 build CMakeFiles\aicup2020.dir\MyStrategy.cpp.obj: CXX_COMPILER__aicup2020_Debug ..\..\..\MyStrategy.cpp || cmake_object_order_depends_target_aicup2020
   DEFINES = -DWIN32
   FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1
@@ -291,7 +283,7 @@ build CMakeFiles\aicup2020.dir\model\Vec2Int.cpp.obj: CXX_COMPILER__aicup2020_De
 #############################################
 # Link the executable aicup2020.exe
 
-build aicup2020.exe: CXX_EXECUTABLE_LINKER__aicup2020_Debug CMakeFiles\aicup2020.dir\DebugInterface.cpp.obj CMakeFiles\aicup2020.dir\HFSM.cpp.obj CMakeFiles\aicup2020.dir\MyStrategy.cpp.obj CMakeFiles\aicup2020.dir\Stream.cpp.obj CMakeFiles\aicup2020.dir\TcpStream.cpp.obj CMakeFiles\aicup2020.dir\main.cpp.obj CMakeFiles\aicup2020.dir\model\Action.cpp.obj CMakeFiles\aicup2020.dir\model\AttackAction.cpp.obj CMakeFiles\aicup2020.dir\model\AttackProperties.cpp.obj CMakeFiles\aicup2020.dir\model\AutoAttack.cpp.obj CMakeFiles\aicup2020.dir\model\BuildAction.cpp.obj CMakeFiles\aicup2020.dir\model\BuildProperties.cpp.obj CMakeFiles\aicup2020.dir\model\Camera.cpp.obj CMakeFiles\aicup2020.dir\model\ClientMessage.cpp.obj CMakeFiles\aicup2020.dir\model\Color.cpp.obj CMakeFiles\aicup2020.dir\model\ColoredVertex.cpp.obj CMakeFiles\aicup2020.dir\model\DebugCommand.cpp.obj CMakeFiles\aicup2020.dir\model\DebugData.cpp.obj CMakeFiles\aicup2020.dir\model\DebugState.cpp.obj CMakeFiles\aicup2020.dir\model\Entity.cpp.obj CMakeFiles\aicup2020.dir\model\EntityAction.cpp.obj CMakeFiles\aicup2020.dir\model\EntityProperties.cpp.obj CMakeFiles\aicup2020.dir\model\MoveAction.cpp.obj CMakeFiles\aicup2020.dir\model\Player.cpp.obj CMakeFiles\aicup2020.dir\model\PlayerView.cpp.obj CMakeFiles\aicup2020.dir\model\RepairAction.cpp.obj CMakeFiles\aicup2020.dir\model\RepairProperties.cpp.obj CMakeFiles\aicup2020.dir\model\ServerMessage.cpp.obj CMakeFiles\aicup2020.dir\model\Vec2Float.cpp.obj CMakeFiles\aicup2020.dir\model\Vec2Int.cpp.obj
+build aicup2020.exe: CXX_EXECUTABLE_LINKER__aicup2020_Debug CMakeFiles\aicup2020.dir\DebugInterface.cpp.obj CMakeFiles\aicup2020.dir\MyStrategy.cpp.obj CMakeFiles\aicup2020.dir\Stream.cpp.obj CMakeFiles\aicup2020.dir\TcpStream.cpp.obj CMakeFiles\aicup2020.dir\main.cpp.obj CMakeFiles\aicup2020.dir\model\Action.cpp.obj CMakeFiles\aicup2020.dir\model\AttackAction.cpp.obj CMakeFiles\aicup2020.dir\model\AttackProperties.cpp.obj CMakeFiles\aicup2020.dir\model\AutoAttack.cpp.obj CMakeFiles\aicup2020.dir\model\BuildAction.cpp.obj CMakeFiles\aicup2020.dir\model\BuildProperties.cpp.obj CMakeFiles\aicup2020.dir\model\Camera.cpp.obj CMakeFiles\aicup2020.dir\model\ClientMessage.cpp.obj CMakeFiles\aicup2020.dir\model\Color.cpp.obj CMakeFiles\aicup2020.dir\model\ColoredVertex.cpp.obj CMakeFiles\aicup2020.dir\model\DebugCommand.cpp.obj CMakeFiles\aicup2020.dir\model\DebugData.cpp.obj CMakeFiles\aicup2020.dir\model\DebugState.cpp.obj CMakeFiles\aicup2020.dir\model\Entity.cpp.obj CMakeFiles\aicup2020.dir\model\EntityAction.cpp.obj CMakeFiles\aicup2020.dir\model\EntityProperties.cpp.obj CMakeFiles\aicup2020.dir\model\MoveAction.cpp.obj CMakeFiles\aicup2020.dir\model\Player.cpp.obj CMakeFiles\aicup2020.dir\model\PlayerView.cpp.obj CMakeFiles\aicup2020.dir\model\RepairAction.cpp.obj CMakeFiles\aicup2020.dir\model\RepairProperties.cpp.obj CMakeFiles\aicup2020.dir\model\ServerMessage.cpp.obj CMakeFiles\aicup2020.dir\model\Vec2Float.cpp.obj CMakeFiles\aicup2020.dir\model\Vec2Int.cpp.obj
   FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1
   LINK_FLAGS = /machine:x64 /debug /INCREMENTAL /subsystem:console
   LINK_LIBRARIES = Ws2_32.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib
