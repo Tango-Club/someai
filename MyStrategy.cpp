@@ -27,7 +27,7 @@ enum class NodeType
 
 namespace HfsmData
 {
-	bool first = 1;
+	int minerCounter = 0;
 	std::map<int, std::shared_ptr<HfsmNode>>hfsmStates;
 	std::map<int, Entity>viewById;
 	PlayerView playerView;
@@ -395,9 +395,11 @@ public:
 class MinerNode : public HfsmNode
 {
 public:
+	int mineType;
 	std::set<EntityType>noEscape;
 	MinerNode(Entity entity) :HfsmNode(entity)
 	{
+		mineType = HfsmData::minerCounter++;
 		noEscape = { EntityType::BUILDER_UNIT };
 	}
 	virtual NodeType get_type()
@@ -410,7 +412,7 @@ public:
 		{
 			const Entity& entity = HfsmData::playerView.entities[i];
 			if (entity.playerId == nullptr || *entity.playerId != HfsmData::playerView.myId)continue;
-			if (entity.entityType!=EntityType::RANGED_UNIT)continue;
+			if (entity.entityType != EntityType::RANGED_UNIT)continue;
 			if (HfsmData::dis(selfInfo, entity) <= 2)
 				return nullptr;
 		}
@@ -429,17 +431,17 @@ public:
 	virtual EntityAction get_action()
 	{
 		std::shared_ptr<MoveAction> moveAction = nullptr;
-		if (selfInfo.id % 3 == 0)
+		if (mineType % 3 == 0)
 		{
 			moveAction = std::shared_ptr<MoveAction>(new MoveAction(
 				Vec2Int(HfsmData::playerView.mapSize - 1, HfsmData::playerView.mapSize - 1), true, true));
 		}
-		if (selfInfo.id % 3 == 1)
+		if (mineType % 3 == 1)
 		{
 			moveAction = std::shared_ptr<MoveAction>(new MoveAction(
 				Vec2Int(selfInfo.position.x, HfsmData::playerView.mapSize - 1), true, true));
 		}
-		if (selfInfo.id % 3 == 2)
+		if (mineType % 3 == 2)
 		{
 			moveAction = std::shared_ptr<MoveAction>(new MoveAction(
 				Vec2Int(HfsmData::playerView.mapSize - 1, selfInfo.position.y), true, true));
@@ -656,7 +658,7 @@ public:
 				return nullptr;
 		}
 		if (HfsmData::dis(selfInfo, HfsmData::viewById[target]) <= 2)timer--;
-		if (timer<= 0)
+		if (timer <= 0)
 			return std::shared_ptr<HfsmNode>(new DaemonNode(selfInfo));
 		return nullptr;
 	}
@@ -664,18 +666,22 @@ public:
 	{
 		std::shared_ptr<MoveAction> moveAction = std::shared_ptr<MoveAction>(new MoveAction(
 			HfsmData::viewById[target].position, true, true));
-		if (HfsmData::viewById[target].id % 3 == 0)
+		if (HfsmData::viewById[target].playerId!=nullptr&&*HfsmData::viewById[target].playerId==HfsmData::playerView.myId&&HfsmData::hfsmStates[target]->get_type() == NodeType::MinerNode)
 		{
-			moveAction->target.x++;
-			moveAction->target.y++;
-		}
-		if (HfsmData::viewById[target].id % 3 == 1)
-		{
-			moveAction->target.y++;
-		}
-		if (HfsmData::viewById[target].id % 3 == 2)
-		{
-			moveAction->target.x++;
+			int minerType = std::dynamic_pointer_cast<MinerNode>(HfsmData::hfsmStates[target])->mineType % 3;
+			if (minerType == 0)
+			{
+				moveAction->target.x++;
+				moveAction->target.y++;
+			}
+			if (minerType == 1)
+			{
+				moveAction->target.y++;
+			}
+			if (minerType == 2)
+			{
+				moveAction->target.x++;
+			}
 		}
 		for (size_t i = 0; i < HfsmData::playerView.entities.size(); i++)
 		{
@@ -864,6 +870,7 @@ void repairConvene()
 		if (entity.playerId == nullptr || *entity.playerId != HfsmData::playerView.myId)continue;
 		if (HfsmData::playerView.entityProperties.at(entity.entityType).canMove)continue;
 		if (entity.health == HfsmData::playerView.entityProperties.at(entity.entityType).maxHealth)continue;
+		if (HfsmData::player.resource < 50 && entity.active)continue;
 		unhealthy.push_back(entity);
 	}
 	std::vector<Entity>miner = getNodes(NodeType::MinerNode);
@@ -969,10 +976,10 @@ void buildRangerBaseConvene()
 }
 void buildTurretConvene()
 {
-	if (HfsmData::playerView.currentTick<200||HfsmData::player.resource < HfsmData::TURRET.initialCost)return;
+	if (HfsmData::playerView.currentTick < 200 || HfsmData::player.resource < HfsmData::TURRET.initialCost)return;
 	std::vector<Entity>miner = getNodes(NodeType::MinerNode);
 	if (miner.size() == 0)return;
-	for (int i = 3; i <= 23; i+=4)
+	for (int i = 4; i <= 23; i += 6)
 	{
 		for (int j = 24; j <= 24; j++)
 		{
@@ -989,9 +996,9 @@ void buildTurretConvene()
 			}
 		}
 	}
-	for (int i = 24; i <= 24; i ++)
+	for (int i = 24; i <= 24; i++)
 	{
-		for (int j = 3; j <= 24; j+=4)
+		for (int j = 4; j <= 24; j += 6)
 		{
 			if (HfsmData::canFullM(Vec2Int(i, j), HfsmData::TURRET.size))
 			{
@@ -1007,7 +1014,86 @@ void buildTurretConvene()
 		}
 	}
 }
-
+void buildTurretDoubleConvene()
+{
+	if (HfsmData::playerView.currentTick < 300 || HfsmData::player.resource < HfsmData::TURRET.initialCost)return;
+	std::vector<Entity>miner = getNodes(NodeType::MinerNode);
+	if (miner.size() == 0)return;
+	for (int i = 1; i <= 23; i += 6)
+	{
+		for (int j = 25; j <= 25; j++)
+		{
+			if (HfsmData::canFullM(Vec2Int(i, j), HfsmData::TURRET.size))
+			{
+				sort(miner.begin(), miner.end(),
+					[=](Entity a, Entity b)
+					{return HfsmData::dis(Vec2Int(i, j), a.position) > HfsmData::dis(Vec2Int(i, j), b.position); });
+				Entity entityE = miner.back();
+				HfsmData::hfsmStates[entityE.id] = std::shared_ptr<HfsmNode>(new  BuilderNode(
+					entityE, EntityType::TURRET, Vec2Int(i, j)));
+				miner.pop_back();
+				return;
+			}
+		}
+	}
+	for (int i = 25; i <= 25; i++)
+	{
+		for (int j = 1; j <= 23; j += 6)
+		{
+			if (HfsmData::canFullM(Vec2Int(i, j), HfsmData::TURRET.size))
+			{
+				sort(miner.begin(), miner.end(),
+					[=](Entity a, Entity b)
+					{return HfsmData::dis(Vec2Int(i, j), a.position) > HfsmData::dis(Vec2Int(i, j), b.position); });
+				Entity entityE = miner.back();
+				HfsmData::hfsmStates[entityE.id] = std::shared_ptr<HfsmNode>(new  BuilderNode(
+					entityE, EntityType::TURRET, Vec2Int(i, j)));
+				miner.pop_back();
+				return;
+			}
+		}
+	}
+}
+void buildTurretTripleConvene()
+{
+	if (HfsmData::playerView.currentTick < 500 || HfsmData::player.resource < HfsmData::TURRET.initialCost)return;
+	std::vector<Entity>miner = getNodes(NodeType::MinerNode);
+	if (miner.size() == 0)return;
+	for (int i = 4; i <= 23; i += 6)
+	{
+		for (int j = 26; j <= 26; j++)
+		{
+			if (HfsmData::canFullM(Vec2Int(i, j), HfsmData::TURRET.size))
+			{
+				sort(miner.begin(), miner.end(),
+					[=](Entity a, Entity b)
+					{return HfsmData::dis(Vec2Int(i, j), a.position) > HfsmData::dis(Vec2Int(i, j), b.position); });
+				Entity entityE = miner.back();
+				HfsmData::hfsmStates[entityE.id] = std::shared_ptr<HfsmNode>(new  BuilderNode(
+					entityE, EntityType::TURRET, Vec2Int(i, j)));
+				miner.pop_back();
+				return;
+			}
+		}
+	}
+	for (int i = 26; i <= 26; i++)
+	{
+		for (int j = 4; j <= 24; j += 6)
+		{
+			if (HfsmData::canFullM(Vec2Int(i, j), HfsmData::TURRET.size))
+			{
+				sort(miner.begin(), miner.end(),
+					[=](Entity a, Entity b)
+					{return HfsmData::dis(Vec2Int(i, j), a.position) > HfsmData::dis(Vec2Int(i, j), b.position); });
+				Entity entityE = miner.back();
+				HfsmData::hfsmStates[entityE.id] = std::shared_ptr<HfsmNode>(new  BuilderNode(
+					entityE, EntityType::TURRET, Vec2Int(i, j)));
+				miner.pop_back();
+				return;
+			}
+		}
+	}
+}
 class Group;
 int groupCnt = 0;
 std::vector<Group>groups;
@@ -1052,7 +1138,7 @@ public:
 			bool isClose = 1;
 			Vec2Int target = targets.front();
 			for (Entity attacker : entitys)
-				if (HfsmData::dis(target, HfsmData::viewById[attacker.id].position) > entitys.size()-1)isClose = 0;
+				if (HfsmData::dis(target, HfsmData::viewById[attacker.id].position) > entitys.size() - 1)isClose = 0;
 			if (isClose)
 			{
 				timer = 20;
@@ -1107,7 +1193,7 @@ void daemonConvene(int limit)
 				range = HfsmData::playerView.entityProperties.at(entity.entityType).attack->attackRange;
 			if (dis > HfsmData::dis(entity, builder) - range)
 			{
-				dis = HfsmData::dis(entity, builder)-range;
+				dis = HfsmData::dis(entity, builder) - range;
 				enemy = entity;
 			}
 		}
@@ -1126,8 +1212,8 @@ void daemonConvene(int limit)
 			}
 		}
 	}
-	sort(unsafe.begin(), unsafe.end(), 
-		[](Entity a, Entity b){return a.position.x+a.position.y > b.position.x+b.position.y; });
+	sort(unsafe.begin(), unsafe.end(),
+		[](Entity a, Entity b) {return a.position.x + a.position.y > b.position.x + b.position.y; });
 	std::vector<Entity>daemons = getNodes(NodeType::DaemonNode);
 	std::vector<Entity>guards = getNodes(NodeType::GuardNode);
 	for (Entity guard : guards)
@@ -1169,8 +1255,8 @@ void groupsConvene()
 		if (groupCnt % 3 == 1)
 		{
 			targets = {
-				Vec2Int(50,10),
-				Vec2Int(75,15),
+				Vec2Int(1,50),
+				Vec2Int(10,75),
 			};
 		}
 		if (groupCnt % 3 == 2)
@@ -1201,6 +1287,8 @@ void convene()
 	buildHouseConvene();
 	buildRangerBaseConvene();
 	buildTurretConvene();
+	buildTurretDoubleConvene();
+	buildTurretTripleConvene();
 	daemonConvene(15);
 	groupsConvene();
 }
