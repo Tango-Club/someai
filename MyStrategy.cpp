@@ -22,7 +22,8 @@ enum class NodeType
 	BuilderNode,
 	DaemonNode,
 	GuardNode,
-	AttackNode
+	AttackNode,
+	EscaperNode
 };
 
 namespace HfsmData
@@ -248,6 +249,10 @@ class EscaperNode : public HfsmNode
 {
 public:
 	std::set<EntityType>noEscape;
+	virtual NodeType get_type()
+	{
+		return NodeType::EscaperNode;
+	}
 	EscaperNode(Entity entity, std::set<EntityType> noV = {}) :HfsmNode(entity)
 	{
 		noEscape = noV;
@@ -666,7 +671,7 @@ public:
 	{
 		std::shared_ptr<MoveAction> moveAction = std::shared_ptr<MoveAction>(new MoveAction(
 			HfsmData::viewById[target].position, true, true));
-		if (HfsmData::viewById[target].playerId!=nullptr&&*HfsmData::viewById[target].playerId==HfsmData::playerView.myId&&HfsmData::hfsmStates[target]->get_type() == NodeType::MinerNode)
+		if (HfsmData::viewById[target].playerId != nullptr && *HfsmData::viewById[target].playerId == HfsmData::playerView.myId && HfsmData::hfsmStates[target]->get_type() == NodeType::MinerNode)
 		{
 			int minerType = std::dynamic_pointer_cast<MinerNode>(HfsmData::hfsmStates[target])->mineType % 3;
 			if (minerType == 0)
@@ -870,12 +875,14 @@ void repairConvene()
 		if (entity.playerId == nullptr || *entity.playerId != HfsmData::playerView.myId)continue;
 		if (HfsmData::playerView.entityProperties.at(entity.entityType).canMove)continue;
 		if (entity.health == HfsmData::playerView.entityProperties.at(entity.entityType).maxHealth)continue;
-		if (HfsmData::player.resource < 50 && entity.active)continue;
 		unhealthy.push_back(entity);
 	}
-	std::vector<Entity>miner = getNodes(NodeType::MinerNode);
+	std::vector<Entity>miner;
+	if (HfsmData::player.resource > 50)miner = getNodes(NodeType::MinerNode);
+	std::vector<Entity>escaper = getNodes(NodeType::EscaperNode);
 	sort(unhealthy.begin(), unhealthy.end(),
 		[](Entity a, Entity b) {return a.position.x + a.position.y < b.position.x + b.position.y; });
+	miner.insert(miner.end(), escaper.begin(), escaper.end());
 	for (Entity entity : unhealthy)
 	{
 		int cnt = 4;
@@ -918,9 +925,9 @@ void buildHouseConvene()
 	if (population >= 10)return;
 	std::vector<Entity>miner = getNodes(NodeType::MinerNode);
 	if (miner.size() == 0)return;
-	for (int i = 1; i <= 23; i += 4)
+	for (int i = 0; i <= 23; i += 4)
 	{
-		for (int j = 1; j <= 23; j += 4)
+		for (int j = 0; j <= 23; j += 4)
 		{
 			//if (i < 5 && j < 5)continue;;
 			if (HfsmData::canFullM(Vec2Int(i, j), HfsmData::HOUSE.size))
@@ -979,7 +986,7 @@ void buildTurretConvene()
 	if (HfsmData::playerView.currentTick < 200 || HfsmData::player.resource < HfsmData::TURRET.initialCost)return;
 	std::vector<Entity>miner = getNodes(NodeType::MinerNode);
 	if (miner.size() == 0)return;
-	for (int i = 4; i <= 23; i += 6)
+	for (int i = 1; i <= 23; i += 5)
 	{
 		for (int j = 24; j <= 24; j++)
 		{
@@ -998,7 +1005,7 @@ void buildTurretConvene()
 	}
 	for (int i = 24; i <= 24; i++)
 	{
-		for (int j = 4; j <= 24; j += 6)
+		for (int j = 1; j <= 24; j += 5)
 		{
 			if (HfsmData::canFullM(Vec2Int(i, j), HfsmData::TURRET.size))
 			{
@@ -1019,9 +1026,9 @@ void buildTurretDoubleConvene()
 	if (HfsmData::playerView.currentTick < 300 || HfsmData::player.resource < HfsmData::TURRET.initialCost)return;
 	std::vector<Entity>miner = getNodes(NodeType::MinerNode);
 	if (miner.size() == 0)return;
-	for (int i = 1; i <= 23; i += 6)
+	for (int i = 3; i <= 23; i += 5)
 	{
-		for (int j = 25; j <= 25; j++)
+		for (int j = 24; j <= 24; j++)
 		{
 			if (HfsmData::canFullM(Vec2Int(i, j), HfsmData::TURRET.size))
 			{
@@ -1036,9 +1043,9 @@ void buildTurretDoubleConvene()
 			}
 		}
 	}
-	for (int i = 25; i <= 25; i++)
+	for (int i = 24; i <= 24; i++)
 	{
-		for (int j = 1; j <= 23; j += 6)
+		for (int j = 3; j <= 23; j += 5)
 		{
 			if (HfsmData::canFullM(Vec2Int(i, j), HfsmData::TURRET.size))
 			{
@@ -1288,7 +1295,7 @@ void convene()
 	buildRangerBaseConvene();
 	buildTurretConvene();
 	buildTurretDoubleConvene();
-	buildTurretTripleConvene();
+	//buildTurretTripleConvene();
 	daemonConvene(15);
 	groupsConvene();
 }
