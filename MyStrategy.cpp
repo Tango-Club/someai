@@ -412,8 +412,8 @@ public:
 			if (entity.entityType == EntityType::BUILDER_UNIT)
 				cnt++;
 		}
-		if (cnt > HfsmData::countFullPopulation() * 0.8)
-			buildAction = nullptr;
+		//if (cnt > HfsmData::countFullPopulation() * 0.8)
+		//	buildAction = nullptr;
 		std::shared_ptr<RepairAction> repairAction = nullptr;
 		std::shared_ptr<AttackAction> attackAction = nullptr;
 		return EntityAction(moveAction, buildAction, attackAction, repairAction);
@@ -1034,7 +1034,9 @@ void buildHouseConvene()
 		EntityType buildType = std::dynamic_pointer_cast<BuilderNode>(HfsmData::hfsmStates[entity.id])->buildType;
 		population += HfsmData::playerView.entityProperties.at(buildType).populationProvide;
 	}
-	if (population >= 10)
+	if (population >= 15 && HfsmData::playerView.currentTick < 200)
+		return;
+	if (population >= 5&&HfsmData::playerView.currentTick>=200)
 		return;
 	std::vector<Entity> miner = getNodes(NodeType::MinerNode);
 	if (miner.size() == 0)
