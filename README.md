@@ -1,3 +1,3 @@
 # someai
-### HFSM beta: 12/15
-整体开始改为HFSM
+### For CodeCraft 
+### 2020 russian ai cup @https://russianaicup.ru/
